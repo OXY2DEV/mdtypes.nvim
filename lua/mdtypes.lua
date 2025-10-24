@@ -1,6 +1,6 @@
 local mdtypes = {};
 
-mdtypes.get_classes = function (path, buffer, range)
+mdtypes.get_classes = function (path)
 	local could_open, result = pcall(vim.fn.readfile, vim.fn.expand("%:h") .. "/" .. path);
 
 	if not could_open then
@@ -25,6 +25,20 @@ mdtypes.get_classes = function (path, buffer, range)
 
 			tmp = {};
 			in_class = false
+		elseif string.match(line, "^.*%-%-%-+@type%s+(%S+)") then
+			if in_class then
+				classes[#classes].lines = tmp;
+
+				local last_name = classes[#classes].name;
+				output[last_name] = classes[#classes];
+			end
+
+			table.insert(classes, {
+				name = string.match(line, "^.*%-%-%-+@type%s+(%S+)"),
+				lines = {}
+			});
+			tmp = { line };
+			in_class = true;
 		elseif string.match(line, "^.*%-%-%-+@class%s+(%S+)") then
 			if in_class then
 				classes[#classes].lines = tmp;
