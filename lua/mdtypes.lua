@@ -33,11 +33,11 @@ mdtypes.get_classes = function (path)
 				output[last_name] = classes[#classes];
 			end
 
+			table.insert(tmp, line);
 			table.insert(classes, {
 				name = string.match(line, "^.*%-%-%-+@type%s+(%S+)"),
-				lines = {}
+				lines = tmp
 			});
-			tmp = { line };
 			in_class = true;
 		elseif string.match(line, "^.*%-%-%-+@class%s+(%S+)") then
 			if in_class then
@@ -47,15 +47,22 @@ mdtypes.get_classes = function (path)
 				output[last_name] = classes[#classes];
 			end
 
+			table.insert(tmp, line);
 			table.insert(classes, {
 				name = string.match(line, "^.*%-%-%-+@class%s+(%S+)"),
-				lines = {}
+				lines = tmp
 			});
-			tmp = { line };
 			in_class = true;
 		else
 			table.insert(tmp, line);
 		end
+	end
+
+	if in_class and #tmp > 0 then
+		classes[#classes].lines = tmp;
+
+		local last_name = classes[#classes].name;
+		output[last_name] = classes[#classes];
 	end
 
 	return classes, output;
