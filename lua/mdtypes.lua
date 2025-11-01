@@ -34,8 +34,8 @@ mdtypes._annotations = function (path)
 		if string.match(line, "^%s*$") then
 			flush();
 		elseif not string.match(line, "^%s*%-%-+") then
-			if #buffer > 0 and ( string.match(line, "(%w+)%s*=%s*function") or string.match(line, "function%s+(%w+)") ) then
-				local name = string.match(line, "(%w+)%s*=%s*function") or string.match(line, "function%s+(%w+)");
+			if #buffer > 0 and ( string.match(line, "(%S+)%s*=%s*function") or string.match(line, "function%s+(%w+)") ) then
+				local name = string.match(line, "(%S+)%s*=%s*function") or string.match(line, "function%s+(%w+)");
 
 				table.insert(annotations, {
 					kind = "funcref",
@@ -56,12 +56,26 @@ mdtypes._annotations = function (path)
 
 			if vim.list_contains(valid, kind) then
 				-- Annotation.
-				flush();
-				table.insert(annotations, {
-					kind = kind,
-					name = name,
-					lines = { line }
-				});
+
+				if string.match(buffer[#buffer] or "", "^%s*%-%-%-+@%w+") then
+					flush();
+					table.insert(annotations, {
+						kind = kind,
+						name = name,
+						lines = { line }
+					});
+				else
+					local _lines = vim.deepcopy(buffer);
+					table.insert(_lines, line);
+					buffer = {};
+
+					table.insert(annotations, {
+						kind = kind,
+						name = name,
+						lines = _lines
+					});
+				end
+
 				is_within_chunk = true;
 			else
 				table.insert(buffer, line);
@@ -77,6 +91,9 @@ mdtypes._annotations = function (path)
 	---|fE
 end
 
+--[[ Gets function declarations & definitions. ]]
+---@param path string
+---@return table
 mdtypes._function = function (path)
 	---|fS
 
@@ -126,10 +143,9 @@ mdtypes._function = function (path)
 					local flines = vim.api.nvim_buf_get_lines(buf, R[1], R[3] + 1, false);
 
 					local fname_node = capture_node:field("name")[1];
-				vim.print(name);
 
 					table.insert(annotations, {
-						kind = "functdecl",
+						kind = "function",
 						name = fname_node and vim.treesitter.get_node_text(fname_node, buf, {}) or nil,
 
 						lines = remove_leader(flines, #string.match(flines[1] or "", "^%s*"))
@@ -141,7 +157,7 @@ mdtypes._function = function (path)
 					local fname = string.match(flines[1] or "", "(%S+)%s*=%s*function");
 
 					table.insert(annotations, {
-						kind = "functdecl",
+						kind = "function",
 						name = fname,
 
 						lines = remove_leader(flines, #string.match(flines[1] or "", "^%s*"))
@@ -156,139 +172,106 @@ mdtypes._function = function (path)
 	---|fE
 end
 
+---[[ Evaluates given expression. ]]
+---@param expr string
+---@return string
 mdtypes._eval = function (expr)
-	return vim.api.nvim_exec2("=" .. expr, { output = true }).output;
-end
+	local could_eval, evaled = pcall(load, "return " .. expr);
 
-mdtypes.get_classes = function (path)
-	local could_open, result = pcall(vim.fn.readfile, vim.fn.expand("%:h") .. "/" .. path);
+	if could_eval and evaled then
+		local could_call, value = pcall(evaled);
 
-	if not could_open then
-		result = { result };
-	end
-
--- vim.print(
--- 	pcall(mdtypes._eval, 'vim')
--- );
-
-	local classes = {};
-	local tmp = {};
-
-	local output = {};
-
-	local in_class = false;
-
-	for _, line in ipairs(result) do
-		if not string.match(line, "^%s*%-%-%-+") then
-			if in_class and #classes > 0 then
-				classes[#classes].lines = tmp;
-
-				local last_name = classes[#classes].name;
-				output[last_name] = classes[#classes];
-			end
-
-			tmp = {};
-			in_class = false
-		elseif string.match(line, "^.*%-%-%-+@alias%s+(%S+)") then
-			if in_class then
-				classes[#classes].lines = tmp;
-
-				local last_name = classes[#classes].name;
-				output[last_name] = classes[#classes];
-			end
-
-			table.insert(tmp, line);
-			table.insert(classes, {
-				name = string.match(line, "^.*%-%-%-+@alias%s+(%S+)"),
-				lines = tmp
-			});
-			in_class = true;
-		elseif string.match(line, "^.*%-%-%-+@type%s+(%S+)") then
-			if in_class then
-				classes[#classes].lines = tmp;
-
-				local last_name = classes[#classes].name;
-				output[last_name] = classes[#classes];
-			end
-
-			table.insert(tmp, line);
-			table.insert(classes, {
-				name = string.match(line, "^.*%-%-%-+@type%s+(%S+)"),
-				lines = tmp
-			});
-			in_class = true;
-		elseif string.match(line, "^.*%-%-%-+@class%s+(%S+)") then
-			if in_class then
-				classes[#classes].lines = tmp;
-
-				local last_name = classes[#classes].name;
-				output[last_name] = classes[#classes];
-			end
-
-			table.insert(tmp, line);
-			table.insert(classes, {
-				name = string.match(line, "^.*%-%-%-+@class%s+(%S+)"),
-				lines = tmp
-			});
-			in_class = true;
-		else
-			table.insert(tmp, line);
+		if could_call then
+			return expr .. " = " .. vim.inspect(value);
 		end
+		-- return vim.inspect(evald());
 	end
 
-	if in_class and #tmp > 0 then
-		classes[#classes].lines = tmp;
-
-		local last_name = classes[#classes].name;
-		output[last_name] = classes[#classes];
-	end
-
-	return classes, output;
+	return "";
 end
 
+--- Parse code blocks.
+---@param buffer integer
+---@return table[]
 mdtypes.parse = function (buffer)
 	---|fS
 
 	local root_parser = vim.treesitter.get_parser(buffer);
 
 	if not root_parser then
-		return;
+		return {};
 	end
 
 	root_parser:parse(true);
 	local output = {};
+	local vars = {};
+
+	---@param TSTree TSTree
+	local function get_code_blocks (TSTree)
+		local query = vim.treesitter.query.parse("markdown", "(fenced_code_block) @block");
+
+		for _, capture_node, _, _ in query:iter_captures(TSTree:root(), buffer) do
+			local info_string;
+
+			for child in capture_node:iter_children() do
+				if child:type() == "info_string" then
+					info_string = child;
+					break;
+				end
+			end
+
+			if info_string then
+				local text = vim.treesitter.get_node_text(info_string, buffer, {});
+
+				local properties = {
+					range = { capture_node:range() },
+					data = {},
+				};
+
+				if string.match(text, "eval: %S.*$") then
+					table.insert(properties.data, {
+						kind = "eval",
+						value = string.match(text, "eval: (.+)$")
+					});
+
+					text = string.gsub(text, "eval: .+$", "");
+				end
+
+				local parts = vim.fn.split(text, ",", false);
+
+				for _, part in ipairs(parts) do
+					for key, value in string.gmatch(part, "(%w+): ([^%s,]+)") do
+						if key == "from" then
+							properties.path = string.gsub(value, "%$[a-zA-Z]", function (k)
+								if vars[k] then
+									return vars[k];
+								end
+
+								return "";
+							end);
+						elseif string.match(key, "^%$") then
+							vars[key] = value;
+						else
+							table.insert(properties.data, {
+								kind = key,
+								value = value
+							});
+						end
+					end
+				end
+
+				if vim.tbl_isempty(properties.data) == false then
+					table.insert(output, 1, properties);
+				end
+			end
+		end
+	end
 
 	root_parser:for_each_tree(function (TSTree, language_tree)
 		local lang = language_tree:lang();
 
 		if lang == "markdown" then
-			local query = vim.treesitter.query.parse("markdown", "(fenced_code_block) @block");
-
-			for _, capture_node, _, _ in query:iter_captures(TSTree:root(), buffer) do
-				local info_string;
-
-				for child in capture_node:iter_children() do
-					if child:type() == "info_string" then
-						info_string = child;
-						break;
-					end
-				end
-
-				if info_string then
-					local text = vim.treesitter.get_node_text(info_string, buffer, {});
-					local from = string.match(text, "from: (%S+)");
-					local class = string.match(text, "class: (%S+)");
-
-					if from and class then
-						table.insert(output, 1, {
-							range = { capture_node:range() },
-
-							from = from,
-							class = class
-						});
-					end
-				end
-			end
+			get_code_blocks(TSTree);
 		end
 	end);
 
@@ -297,21 +280,64 @@ mdtypes.parse = function (buffer)
 	---|fE
 end
 
-mdtypes.generate = function (buffer)
-	buffer = buffer or vim.api.nvim_get_current_buf();
-	local matches = mdtypes.parse(buffer);
+mdtypes.__cache = {};
 
-	vim.api.nvim_buf_call(buffer, function ()
-		local map = {};
+mdtypes.fill = function (block)
+	---|fS
 
-		for _, match in ipairs(matches or {}) do
-			if not map[match] then
-				_, map.match = mdtypes.get_classes(match.from);
+	local lines = {};
+
+	for e, entry in ipairs(block.data) do
+		if entry.kind == "eval" then
+			vim.list_extend(
+				lines,
+				vim.fn.split(
+					mdtypes._eval(entry.value),
+					"\n"
+				)
+			);
+		elseif block.path then
+			if not mdtypes.__cache[block.path] then
+				mdtypes.__cache[block.path] = {
+					annotations = mdtypes._annotations(block.path),
+					functions = mdtypes._function(block.path),
+				};
 			end
 
-			if map.match[match.class] then
-				local R = match.range;
-				vim.api.nvim_buf_set_lines(buffer, R[1] + 1, R[3] - 1, false, map.match[match.class].lines);
+			local this = mdtypes.__cache[block.path];
+			local is_fn = entry.kind == "function";
+
+			for _, item in ipairs(not is_fn and this.annotations or this.functions) do
+				if item.kind == entry.kind and item.name == entry.value then
+					lines = vim.list_extend(lines, item.lines);
+
+					if e ~= #block.data then
+						table.insert(lines, "");
+					end
+					break;
+				end
+			end
+		end
+	end
+
+	return lines;
+
+	---|fE
+end
+
+mdtypes.generate = function (buffer)
+	mdtypes.__cache = {};
+
+	buffer = buffer or vim.api.nvim_get_current_buf();
+	local blocks = mdtypes.parse(buffer);
+
+	vim.api.nvim_buf_call(buffer, function ()
+		for _, block in ipairs(blocks) do
+			local _lines = mdtypes.fill(block);
+
+			if #_lines > 0 then
+				local R = block.range;
+				vim.api.nvim_buf_set_lines(buffer, R[1] + 1, R[3] - 1, false, _lines);
 			end
 		end
 	end)
