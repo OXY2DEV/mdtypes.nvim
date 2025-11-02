@@ -314,6 +314,7 @@ mdtypes.fill = function (block)
 					if e ~= #block.data then
 						table.insert(lines, "");
 					end
+
 					break;
 				end
 			end
