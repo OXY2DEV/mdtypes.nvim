@@ -240,9 +240,9 @@ mdtypes.parse = function (buffer)
 				local parts = vim.fn.split(text, ",", false);
 
 				for _, part in ipairs(parts) do
-					for key, value in string.gmatch(part, "(%w+): ([^%s,]+)") do
+					for key, value in string.gmatch(part, "([^%s:]+): ([^%s,]+)") do
 						if key == "from" then
-							properties.path = string.gsub(value, "%$[a-zA-Z]", function (k)
+							properties.path = string.gsub(value, "%$[a-zA-Z]+", function (k)
 								if vars[k] then
 									return vars[k];
 								end
