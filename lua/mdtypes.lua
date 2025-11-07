@@ -12,15 +12,15 @@ mdtypes._definitions = function (path)
 		return {};
 	end
 
-	local annotations = {};
+	local definitions = {};
 	local buffer = {};
 
 	local is_within_chunk = false;
 
 	local function flush (line)
-		if is_within_chunk and #annotations > 0 then
+		if is_within_chunk and #definitions > 0 then
 			table.insert(buffer, line);
-			vim.list_extend(annotations[#annotations].lines or {}, buffer);
+			vim.list_extend(definitions[#definitions].lines or {}, buffer);
 
 			is_within_chunk = false;
 		end
@@ -37,7 +37,7 @@ mdtypes._definitions = function (path)
 			if #buffer > 0 and ( string.match(line, "(%S+)%s*=%s*function") or string.match(line, "function%s+(%w+)") ) then
 				local name = string.match(line, "(%S+)%s*=%s*function") or string.match(line, "function%s+(%w+)");
 
-				table.insert(annotations, {
+				table.insert(definitions, {
 					kind = "funcref",
 					name = name,
 					lines = buffer
@@ -59,7 +59,7 @@ mdtypes._definitions = function (path)
 
 				if string.match(buffer[#buffer] or "", "^%s*%-%-%-+@%w+") then
 					flush();
-					table.insert(annotations, {
+					table.insert(definitions, {
 						kind = kind,
 						name = name,
 						lines = { line }
@@ -69,7 +69,7 @@ mdtypes._definitions = function (path)
 					table.insert(_lines, line);
 					buffer = {};
 
-					table.insert(annotations, {
+					table.insert(definitions, {
 						kind = kind,
 						name = name,
 						lines = _lines
@@ -86,7 +86,7 @@ mdtypes._definitions = function (path)
 	end
 
 	flush();
-	return annotations;
+	return definitions;
 
 	---|fE
 end
@@ -108,7 +108,7 @@ mdtypes._function = function (path)
 
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines);
 
-	local annotations = {};
+	local functions = {};
 	local query = vim.treesitter.query.parse("lua", [[
 		(function_declaration
 			name: (_)) @funcdecl
@@ -144,7 +144,7 @@ mdtypes._function = function (path)
 
 					local fname_node = capture_node:field("name")[1];
 
-					table.insert(annotations, {
+					table.insert(functions, {
 						kind = "function",
 						name = fname_node and vim.treesitter.get_node_text(fname_node, buf, {}) or nil,
 
@@ -156,7 +156,7 @@ mdtypes._function = function (path)
 
 					local fname = string.match(flines[1] or "", "(%S+)%s*=%s*function");
 
-					table.insert(annotations, {
+					table.insert(functions, {
 						kind = "function",
 						name = fname,
 
@@ -165,9 +165,10 @@ mdtypes._function = function (path)
 				end
 			end
 		end
-	end)
+	end);
 
-	return annotations;
+	pcall(vim.api.nvim_buf_delete, buf, true);
+	return functions;
 
 	---|fE
 end
@@ -176,6 +177,8 @@ end
 ---@param expr string
 ---@return string
 mdtypes._eval = function (expr)
+	---|fS
+
 	local could_eval, evaled = pcall(load, "return " .. expr);
 
 	if could_eval and evaled then
@@ -184,10 +187,11 @@ mdtypes._eval = function (expr)
 		if could_call then
 			return expr .. " = " .. vim.inspect(value);
 		end
-		-- return vim.inspect(evald());
 	end
 
 	return "";
+
+	---|fE
 end
 
 --- Parse code blocks.
@@ -302,7 +306,7 @@ mdtypes.fill = function (block)
 		elseif block.path then
 			if not mdtypes.__cache[block.path] then
 				mdtypes.__cache[block.path] = {
-					annotations = mdtypes._annotations(block.path),
+					definitions = mdtypes._definitions(block.path),
 					functions = mdtypes._function(block.path),
 				};
 			end
@@ -310,7 +314,7 @@ mdtypes.fill = function (block)
 			local this = mdtypes.__cache[block.path];
 			local is_fn = entry.kind == "function";
 
-			for _, item in ipairs(not is_fn and this.annotations or this.functions) do
+			for _, item in ipairs(not is_fn and this.definitions or this.functions) do
 				if item.kind == entry.kind and item.name == entry.value then
 					lines = vim.list_extend(lines, item.lines);
 
@@ -367,8 +371,8 @@ mdtypes.setup = function ()
 		mdtypes.generate();
 	end, {
 		nargs = 0,
-		desc = "Fill types"
-	})
+		desc = "Generate type definitions & evaluation results for code blocks in markdown."
+	});
 end
 
 return mdtypes;
