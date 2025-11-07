@@ -1,9 +1,9 @@
 local mdtypes = {};
 
---[[ Gets annotations from `path`. ]]
+--[[ Gets definitions from `path`. ]]
 ---@param path string
----@return table
-mdtypes._annotations = function (path)
+---@return mdtypes.parsed
+mdtypes._definitions = function (path)
 	---|fS
 
 	local could_open, lines = pcall(vim.fn.readfile, vim.fn.expand("%:h") .. "/" .. path);
@@ -93,7 +93,7 @@ end
 
 --[[ Gets function declarations & definitions. ]]
 ---@param path string
----@return table
+---@return mdtypes.parsed
 mdtypes._function = function (path)
 	---|fS
 
@@ -192,7 +192,7 @@ end
 
 --- Parse code blocks.
 ---@param buffer integer
----@return table[]
+---@return mdtypes.code_block[]
 mdtypes.parse = function (buffer)
 	---|fS
 
@@ -280,8 +280,11 @@ mdtypes.parse = function (buffer)
 	---|fE
 end
 
+---@type table<string, mdtyles.cache.buf> Cached parsed data.
 mdtypes.__cache = {};
 
+---@param block mdtypes.code_block
+---@return string[]
 mdtypes.fill = function (block)
 	---|fS
 
@@ -326,7 +329,11 @@ mdtypes.fill = function (block)
 	---|fE
 end
 
+--- Generates text inside code blocks.
+---@param buffer? integer
 mdtypes.generate = function (buffer)
+	---|fS
+
 	mdtypes.__cache = {};
 
 	buffer = buffer or vim.api.nvim_get_current_buf();
@@ -341,9 +348,9 @@ mdtypes.generate = function (buffer)
 				vim.api.nvim_buf_set_lines(buffer, R[1] + 1, R[3] - 1, false, _lines);
 			end
 		end
-	end)
+	end);
 
-	-- vim.print(matches);
+	---|fE
 end
 
 mdtypes.setup = function ()
