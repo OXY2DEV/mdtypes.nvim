@@ -345,6 +345,15 @@ mdtypes.generate = function (buffer)
 
 			if #_lines > 0 then
 				local R = block.range;
+				local start = vim.api.nvim_buf_get_lines(buffer, R[1], R[1], false)[1];
+				local delimiter = string.match(start or "", "^[^`]+");
+
+				if delimiter then
+					for l, line in ipairs(_lines) do
+						_lines[l] = delimiter .. line;
+					end
+				end
+
 				vim.api.nvim_buf_set_lines(buffer, R[1] + 1, R[3] - 1, false, _lines);
 			end
 		end
