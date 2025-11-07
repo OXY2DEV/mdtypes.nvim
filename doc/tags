@@ -1,0 +1,13 @@
+!_TAG_FILE_ENCODING	utf-8	//
+mdtypes.nvim-api	mdtypes.nvim.txt	/*mdtypes.nvim-api*
+mdtypes.nvim-features	mdtypes.nvim.txt	/*mdtypes.nvim-features*
+mdtypes.nvim-syntax	mdtypes.nvim.txt	/*mdtypes.nvim-syntax*
+mdtypes.nvim-syntax.alias	mdtypes.nvim.txt	/*mdtypes.nvim-syntax.alias*
+mdtypes.nvim-syntax.class	mdtypes.nvim.txt	/*mdtypes.nvim-syntax.class*
+mdtypes.nvim-syntax.eval	mdtypes.nvim.txt	/*mdtypes.nvim-syntax.eval*
+mdtypes.nvim-syntax.from	mdtypes.nvim.txt	/*mdtypes.nvim-syntax.from*
+mdtypes.nvim-syntax.funcref	mdtypes.nvim.txt	/*mdtypes.nvim-syntax.funcref*
+mdtypes.nvim-syntax.function	mdtypes.nvim.txt	/*mdtypes.nvim-syntax.function*
+mdtypes.nvim-syntax.variables	mdtypes.nvim.txt	/*mdtypes.nvim-syntax.variables*
+mdtypes.nvim-usage	mdtypes.nvim.txt	/*mdtypes.nvim-usage*
+mdtypes.nvim.txt	mdtypes.nvim.txt	/*mdtypes.nvim.txt*

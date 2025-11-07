@@ -1,0 +1,295 @@
+*mdtypes.nvim.txt*            👾 Auto Lua type-definition retriever for markdown
+
+--------------------------------------------------------------------------------
+Table of contents
+
+✨ Features ............................................ |mdtypes.nvim-features|
+🎇 Usage .................................................. |mdtypes.nvim-usage|
+💻 API function ............................................. |mdtypes.nvim-api|
+💡 Syntax ................................................ |mdtypes.nvim-syntax|
+
+--------------------------------------------------------------------------------
+✨ Features                                              *mdtypes.nvim-features*
+
+- Retrieve `class`, `alias` & `type`s from given lua file into code blocks.
+- Evaluate expressions as Lua and insert returned value into code blocks.
+- Retrieve `function` definitions into code blocks.
+- Allows showing multiple values in a single code block.
+
+And much more!
+
+--------------------------------------------------------------------------------
+🧭 Requirements
+
+Both of these should ship with `Neovim`,
+
+- `tree-sitter-markdown`.
+- `tree-sitter-lua`.
+
+--------------------------------------------------------------------------------
+📦 Installation
+
+🧩 Vim-plug ~
+
+>vim
+	Plug "OXY2DEV/mdtypes.nvim"
+<
+
+💤 lazy.nvim ~
+
+>lua
+	{
+	    "OXY2DEV/mdtypes.nvim",
+	    lazy = false
+	},
+<
+
+>lua
+	return {
+	    "OXY2DEV/mdtypes.nvim",
+	    lazy = false
+	};
+<
+
+🦠 mini.deps ~
+
+>lua
+	local MiniDeps = require("mini.deps");
+	
+	MiniDeps.add({
+	    source = "OXY2DEV/mdtypes.nvim",
+	})
+<
+
+🌒 rocks.nvim ~
+
+▋  Warning
+▋ `luarocks package` may sometimes be a bit behind `main`.
+
+>vim
+	:Rocks install mdtypes.nvim
+<
+
+📥 GitHub release ~
+
+Tagged releases can be found in the release page {1}.
+
+▋ 󰋽 Note
+▋ `Github releases` may sometimes be slightly behind `main`.
+
+--------------------------------------------------------------------------------
+🎇 Usage                                                    *mdtypes.nvim-usage*
+
+`mdtypes.nvim` comes with a single command.
+
+>vim
+	:Types
+<
+
+This fills up code blocks in the current buffer.
+
+💻 API function                                               *mdtypes.nvim-api* ~
+
+You can use the provided API function in your scripts.
+
+>lua
+	local buffer = vim.api.nvim_get_current_buf();
+	require("mdtypes").generate(buffer);
+<
+
+--------------------------------------------------------------------------------
+💡 Syntax                                                  *mdtypes.nvim-syntax*
+
+`mdtypes` makes use of info strings in code blocks. Info strings look as
+follows,
+
+>
+    ```lua Some info string
+<
+    
+print("hi");
+>
+	The info string contains 1 or more items separated by a `,`. Each item represents a type of data that will be shown in the code block.
+	
+	An example is given below,
+	
+	    ```lua from: ./lua/types/mdtypes.lua, class: mdtypes.parsed.kind
+<
+
+alias                                                *mdtypes.nvim-syntax.alias* ~
+
+Example,
+
+>
+    ```lua from: ./lua/types/mdtypes.lua, alias: mdtypes.parsed.kind
+<
+    
+>
+	Result,
+	
+	```lua from: ./lua/types/mdtypes.lua, alias: mdtypes.parsed.kind
+	---@alias mdtypes.parsed.kind
+	---| "alias" Aliased type definition(`---@alias`).
+	---| "class" Class definition(`---@class`).
+	---| "funcref" Function reference(`---@param` & `---@return` block before a function).
+	---| "function" Function declarations.
+<
+
+Gets a type alias via it's name from the file.
+
+class                                                *mdtypes.nvim-syntax.class* ~
+
+Example,
+
+>
+    ```lua from: ./lua/types/mdtypes.lua, class: mdtypes.parsed.item
+<
+    
+>
+	Result,
+	
+	```lua from: ./lua/types/mdtypes.lua, class: mdtypes.parsed.item
+	---@class mdtypes.parsed.item
+	---
+	---@field kind mdtypes.parsed.kind
+	---@field name string Name of `class`/`alias`/`function`.
+	---@field lines string[] Lines containing this parsed items(leading whitespaces are removed).
+<
+
+Gets the given class via it's name from the file.
+
+eval                                                  *mdtypes.nvim-syntax.eval* ~
+
+Example,
+
+>
+    ```lua eval: 1 + 1
+<
+    
+>
+	Result,
+	
+	```lua eval: 1 + 1
+	1 + 1 = 2
+<
+
+Evaluates given `expression` and shows the returned value.
+
+▋  Important
+▋ This will evaluate everything after `:` as lua. So, use this as the last item.
+
+from                                                  *mdtypes.nvim-syntax.from* ~
+
+Example,
+
+>
+    ```lua from: ./lua/types/mdtypes.lua
+<
+    
+>
+	Specify a `.lua` file to pull the definitions from. There can only be 1 path per code block.
+	
+	>[!NOTE]
+	> The path is relative to the `markdown` file!
+	
+	To reduce the need of writing the same path over & over again you can use `variables` in paths. See variables {2} on how to set them.
+	
+	Variables are written as `$` followed by any number of capital letters. So, `$VAR` is a valid variable, but `$var` is not.
+	
+	Variables can also be within the path itself(e.g. `$NVIM/lua/editor/options.lua`). The variables doesn't need to be defined in the same code block and can be defined in any other code block.
+	
+	Example,
+	
+	    ```lua $PATH: ./lua/types/, $FILE: mdtypes.lua, from: $PATH$FILE class: mdtypes.parsed.item
+<
+
+>lua
+	---@class mdtypes.parsed.item
+	---
+	---@field kind mdtypes.parsed.kind
+	---@field name string Name of `class`/`alias`/`function`.
+	---@field lines string[] Lines containing this parsed items(leading whitespaces are removed).
+<
+
+funcref                                            *mdtypes.nvim-syntax.funcref* ~
+
+Example,
+
+>
+    ```lua from: ./lua/mdtypes.lua, funcref: mdtypes._definitions
+<
+    
+>
+	Result,
+	
+	```lua from: ./lua/mdtypes.lua, funcref: mdtypes._definitions
+	--[[ Gets definitions from `path`. ]]
+	---@param path string
+	---@return mdtypes.parsed
+<
+
+Gets the literal definition of a function via it's name from the file.
+
+function                                          *mdtypes.nvim-syntax.function* ~
+
+Example,
+
+>
+    ```lua from: ./lua/mdtypes.lua, function: mdtypes._eval
+<
+    
+>
+	Result,
+	
+	```lua from: ./lua/mdtypes.lua, function: mdtypes._eval
+	mdtypes._eval = function (expr)
+		---|fS
+	
+		local could_eval, evaled = pcall(load, "return " .. expr);
+	
+		if could_eval and evaled then
+			local could_call, value = pcall(evaled);
+	
+			if could_call then
+				return expr .. " = " .. vim.inspect(value);
+			end
+		end
+	
+		return "";
+	
+		---|fE
+	end
+<
+
+Gets the function definition via it's name from the file.
+
+variables                                        *mdtypes.nvim-syntax.variables* ~
+
+Example,
+
+>
+    ```lua $VAR: ./lua/types/mdtypes.lua, from: $VAR, class: mdtypes.code_block
+<
+    
+>
+	Result,
+	
+	```lua $VAR: ./lua/types/mdtypes.lua, from: $VAR, class: mdtypes.code_block
+	---@class mdtypes.code_block Parsed code block.
+	---
+	---@field path? string File path(relative to the markdown file). May contain `$VAR` style variables.
+	---@field range integer[] Tree-sitter node range(`[ row_start, col_start, row_end, col_end ]`).
+	---@field data mdtypes.code_block.data.item[] List of data to put inside the code block.
+<
+
+Sets path variable. Variable names must only contain Uppercase letters.
+
+They can be defined in any code blocks and can be used in any other code blocks. Only works inside from {3}.
+
+Links ~
+
+1: https://github.com/OXY2DEV/mdtypes.nvim/releases
+2: |mdtypes.nvim-variables|
+3: |mdtypes.nvim-from|
+
+vim:ft=help:textwidth=80:tabstop=4:noexpandtab:

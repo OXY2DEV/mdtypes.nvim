@@ -8,9 +8,9 @@
 
 
 ---@alias mdtypes.parsed.kind
----| "funcref" Function reference(`---@param` & `---@return` block before a function).
----| "class" Class definition(`---@class`).
 ---| "alias" Aliased type definition(`---@alias`).
+---| "class" Class definition(`---@class`).
+---| "funcref" Function reference(`---@param` & `---@return` block before a function).
 ---| "function" Function declarations.
 
 
