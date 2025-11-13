@@ -193,7 +193,10 @@ mdtypes.lua_processors = {
 				local prev = node:prev_named_sibling();
 
 				while prev do
-					N = N + 1;
+					if prev:type() == "field" then
+						N = N + 1;
+					end
+
 					prev = prev:prev_named_sibling();
 				end
 
