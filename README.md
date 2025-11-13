@@ -243,6 +243,41 @@ Result,
 ---@field lines string[] Lines containing this parsed items(leading whitespaces are removed).
 ```
 
+### field
+
+Example,
+
+    ```lua from: ./lua/mdtypes.lua, field: mdtypes._definitions
+    ```
+
+Result,
+
+```lua from: ./lua/mdtypes.lua, function: funcdecl
+---@param TSNode TSNode
+---@param buffer integer
+---@return table
+funcdecl = function (TSNode, buffer)
+	local R = { TSNode:range() };
+	local flines = vim.api.nvim_buf_get_lines(buffer, R[1], R[3] + 1, false);
+
+	local fname_node = TSNode:field("name")[1];
+	local fname = fname_node and vim.treesitter.get_node_text(fname_node, buffer, {}) or nil;
+
+	return {
+		kind = "function",
+		name = fname,
+		funcdef = fname,
+
+		lines = remove_leader(flines, string.match(flines[1] or "", "^%s*"))
+	};
+end,
+```
+
+Gets the field from it's name. Supports `foo.bar` & `foo.bar.baz[1]` syntax.
+
+>[!IMPORTANT]
+> This won't pull type definitions!
+
 ### funcref
 
 Example,

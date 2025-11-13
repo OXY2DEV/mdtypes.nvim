@@ -1,3 +1,18 @@
+---@param entries string[]
+---@param whitespaces string
+---@return string[]
+local function remove_leader (entries, whitespaces)
+	local _lines = {};
+	local pattern = string.rep("%s", whitespaces:len() or 0);
+
+	for _, line in ipairs(entries) do
+		local fixed = string.gsub(line, "^" .. pattern, "");
+		table.insert(_lines, fixed);
+	end
+
+	return _lines;
+end
+
 local mdtypes = {};
 
 --[[ Gets definitions from `path`. ]]
@@ -91,10 +106,129 @@ mdtypes._definitions = function (path)
 	---|fE
 end
 
---[[ Gets function declarations & definitions. ]]
+---@type table<string, function>
+mdtypes.lua_processors = {
+	---@param TSNode TSNode
+	---@param buffer integer
+	---@return table?
+	funcdecl = function (TSNode, buffer)
+		local R = { TSNode:range() };
+		local flines = vim.api.nvim_buf_get_lines(buffer, R[1], R[3] + 1, false);
+
+		local fname_node = TSNode:field("name")[1];
+		local fname = fname_node and vim.treesitter.get_node_text(fname_node, buffer, {}) or nil;
+
+		if not fname then
+			return;
+		end
+
+		return {
+			kind = "function",
+			name = fname,
+			funcref = fname,
+
+			lines = remove_leader(flines, string.match(flines[1] or "", "^%s*"))
+		};
+	end,
+	funcdef = function (TSNode, buffer)
+		local R = { TSNode:range() };
+		local flines = vim.api.nvim_buf_get_lines(buffer, R[1], R[3] + 1, false);
+
+		local fname = string.match(flines[1] or "", "(%S+)%s*=%s*function");
+
+		if not fname then
+			return;
+		end
+
+		if not TSNode:parent() or TSNode:parent():type() ~= "field" then
+			return {
+				kind = "function",
+				name = fname,
+				funcref = fname,
+
+				lines = remove_leader(flines, string.match(flines[1] or "", "^%s*"))
+			};
+		end
+	end,
+	variable = function (TSNode, buffer)
+		local R = { TSNode:range() };
+		local vlines = vim.api.nvim_buf_get_lines(buffer, R[1], R[3] + 1, false);
+
+		local vname = string.match(vlines[1] or "", "(%S+)%s*=");
+
+		return {
+			kind = "var",
+			name = vname,
+
+			lines = remove_leader(vlines, string.match(vlines[1] or "", "^%s*"))
+		};
+	end,
+	field = function (TSNode, buffer)
+		---@param node TSNode
+		---@return string
+		local function field_name (node)
+			local txt = vim.treesitter.get_node_text(node, buffer, {});
+
+			if string.match(txt, "^[^{]") then
+				local matched = string.match(txt, "^(.-)%s*=") or txt;
+
+				if string.match(matched, "^%[") then
+					return matched;
+				else
+					return "." .. matched;
+				end
+			else
+				local N = 1;
+				local prev = node:prev_named_sibling();
+
+				while prev do
+					N = N + 1;
+					prev = prev:prev_named_sibling();
+				end
+
+				return string.format("[%d]", N);
+			end
+		end
+
+		local R = { TSNode:range() };
+		local flines = vim.api.nvim_buf_get_lines(buffer, R[1], R[3] + 1, false);
+
+		local fname = field_name(TSNode);
+		local funcref = string.gsub(fname or "", "^%.", "");
+
+		local parent = TSNode:parent();
+
+		while parent do
+			if parent:type() == "field" then
+				fname = field_name(parent) .. fname;
+			elseif parent:type() == "assignment_statement" then
+				fname = field_name(parent) .. fname;
+				break;
+			end
+
+			parent = parent:parent();
+		end
+
+		if not fname or fname == "" then
+			return;
+		end
+
+		fname = string.gsub(fname, "^%.", "");
+
+		return {
+			kind = "field",
+			name = fname,
+			funcref = funcref,
+
+			lines = remove_leader(flines, string.match(flines[1] or "", "^%s*"))
+		};
+	end
+};
+
+--[[ Gets lua variable, functions etc. from `path`. ]]
 ---@param path string
 ---@return mdtypes.parsed
-mdtypes._function = function (path)
+mdtypes._lua = function (path)
 	---|fS
 
 	local could_open, lines = pcall(vim.fn.readfile, vim.fn.expand("%:h") .. "/" .. path);
@@ -108,12 +242,15 @@ mdtypes._function = function (path)
 
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines);
 
-	local functions = {};
+	local lua = {};
 	local query = vim.treesitter.query.parse("lua", [[
 		(function_declaration
 			name: (_)) @funcdecl
 
 		(function_definition) @funcdef
+
+		(assignment_statement) @variable
+		(field) @field
 	]]);
 
 	local root_parser = vim.treesitter.get_parser(buf);
@@ -122,53 +259,22 @@ mdtypes._function = function (path)
 		return {};
 	end
 
-	local function remove_leader (entries, row_start)
-		local _lines = {};
-
-		for _, line in ipairs(entries) do
-			table.insert(_lines, string.sub(line, row_start));
-		end
-
-		return _lines;
-	end
-
 	root_parser:parse(true);
 	root_parser:for_each_tree(function (TSTree, LanguageTree)
 		if LanguageTree:lang() == "lua" then
 			for capture_id, capture_node, _, _ in query:iter_captures(TSTree:root(), buf) do
 				local name = query.captures[capture_id];
+				local can_cal, val = pcall(mdtypes.lua_processors[name], capture_node, buf);
 
-				if name == "funcdecl" then
-					local R = { capture_node:range() };
-					local flines = vim.api.nvim_buf_get_lines(buf, R[1], R[3] + 1, false);
-
-					local fname_node = capture_node:field("name")[1];
-
-					table.insert(functions, {
-						kind = "function",
-						name = fname_node and vim.treesitter.get_node_text(fname_node, buf, {}) or nil,
-
-						lines = remove_leader(flines, #string.match(flines[1] or "", "^%s*"))
-					});
-				elseif name == "funcdef" then
-					local R = { capture_node:range() };
-					local flines = vim.api.nvim_buf_get_lines(buf, R[1], R[3] + 1, false);
-
-					local fname = string.match(flines[1] or "", "(%S+)%s*=%s*function");
-
-					table.insert(functions, {
-						kind = "function",
-						name = fname,
-
-						lines = remove_leader(flines, #string.match(flines[1] or "", "^%s*"))
-					});
+				if can_cal then
+					table.insert(lua, val);
 				end
 			end
 		end
 	end);
 
 	pcall(vim.api.nvim_buf_delete, buf, true);
-	return functions;
+	return lua;
 
 	---|fE
 end
@@ -294,6 +400,21 @@ mdtypes.fill = function (block)
 
 	local lines = {};
 
+	local function get_funcref (this, funcname)
+		if not funcname then
+			return;
+		elseif not this.definitions then
+			return;
+		end
+
+		for _, item in ipairs(this.definitions) do
+			if item.kind == "funcref" and item.name == funcname then
+				lines = vim.list_extend(lines, item.lines);
+				break;
+			end
+		end
+	end
+
 	for e, entry in ipairs(block.data) do
 		if entry.kind == "eval" then
 			vim.list_extend(
@@ -307,15 +428,16 @@ mdtypes.fill = function (block)
 			if not mdtypes.__cache[block.path] then
 				mdtypes.__cache[block.path] = {
 					definitions = mdtypes._definitions(block.path),
-					functions = mdtypes._function(block.path),
+					lua = mdtypes._lua(block.path),
 				};
 			end
 
 			local this = mdtypes.__cache[block.path];
-			local is_fn = entry.kind == "function";
+			local is_lua = entry.kind == "function" or entry.kind == "var" or entry.kind == "field";
 
-			for _, item in ipairs(not is_fn and this.definitions or this.functions) do
+			for _, item in ipairs(not is_lua and this.definitions or this.lua) do
 				if item.kind == entry.kind and item.name == entry.value then
+					get_funcref(this, item.funcref);
 					lines = vim.list_extend(lines, item.lines);
 
 					if e ~= #block.data then
