@@ -156,6 +156,17 @@ mdtypes.lua_processors = {
 
 		local vname = string.match(vlines[1] or "", "(%S+)%s*=");
 
+		if string.match(vname, "%.") then
+			-- NOTE: `foo.bar` assignments are fields not variables.
+			return {
+				kind = "field",
+				name = vname,
+				funcref = vname,
+
+				lines = remove_leader(vlines, string.match(vlines[1] or "", "^%s*"))
+			};
+		end
+
 		return {
 			kind = "var",
 			name = vname,
