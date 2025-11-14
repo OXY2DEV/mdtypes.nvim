@@ -183,6 +183,9 @@ mdtypes.lua_processors = {
 			if string.match(txt, "^[^{]") then
 				local matched = string.match(txt, "^(.-)%s*=") or txt;
 
+				matched = string.gsub(matched, '^%["', ""):gsub('"%]$', "");
+				matched = string.gsub(matched, "^%['", ""):gsub("'%]$", "");
+
 				if string.match(matched, "^%[") then
 					return matched;
 				else
