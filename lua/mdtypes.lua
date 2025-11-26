@@ -488,12 +488,21 @@ mdtypes.generate = function (buffer)
 
 			if #_lines > 0 then
 				local R = block.range;
-				local start = vim.api.nvim_buf_get_lines(buffer, R[1], R[1], false)[1];
+				local start = vim.api.nvim_buf_get_lines(buffer, R[1], R[1] + 1, false)[1];
 				local delimiter = string.match(start or "", "^[^`]+");
 
-				if delimiter then
-					for l, line in ipairs(_lines) do
+				for l, line in ipairs(_lines) do
+					line = string.gsub(line, "^	+", function (t)
+						return string.rep(
+							string.rep(" ", vim.bo.tabstop or 4),
+							#t
+						);
+					end);
+
+					if delimiter then
 						_lines[l] = delimiter .. line;
+					else
+						_lines[l] = line;
 					end
 				end
 
