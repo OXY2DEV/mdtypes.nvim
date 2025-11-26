@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0](https://github.com/OXY2DEV/mdtypes.nvim/compare/v1.0.0...v1.1.0) (2025-11-26)
+
+
+### Features
+
+* Added field support ([7f0f0a0](https://github.com/OXY2DEV/mdtypes.nvim/commit/7f0f0a0c67c2cd656c67e1d00184fe738d4e5dce))
+* Auto convert leading `tab`s to `space`s ([fd43465](https://github.com/OXY2DEV/mdtypes.nvim/commit/fd43465eb63349c67f0ce8b36839496453825d44))
+
+
+### Bug Fixes
+
+* `[]` styled field names are now correctly supported ([ca702d4](https://github.com/OXY2DEV/mdtypes.nvim/commit/ca702d4c30b9a8418266baefff367ce02eb535c8))
+* **fields:** Correctly number list elements ([007dd0d](https://github.com/OXY2DEV/mdtypes.nvim/commit/007dd0d620c3d6efb105caefb0d022c09d0ebb73))
+
 ## 1.0.0 (2025-11-08)
 
 
