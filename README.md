@@ -34,6 +34,7 @@
                 "^field$": [ "mdtypes.nvim-syntax.field" ],
                 "^funcref$": [ "mdtypes.nvim-syntax.funcref" ],
                 "^function$": [ "mdtypes.nvim-syntax.function" ],
+                "^indent_size$": [ "mdtypes.nvim-syntax.indent_size" ],
                 "^variables$": [ "mdtypes.nvim-syntax.variables", "mdtypes.nvim-syntax.vars" ],
                 "^path variables$": [ "mdtypes.nvim-syntax.path_variables" ]
             }
@@ -331,6 +332,48 @@ end
 
 Gets the function definition via it's name from the file.
 
+### indent_size
+
+>[!IMPORTANT]
+> By default, the source buffers `tabstop` is used for indentation.
+
+Changes indent sizing for the code block.
+
+>[!TIP]
+> Set it to `0` to have `tabs` for indentation.
+
+Example,
+
+    ```lua indent_size: 4 eval: vim.v
+    ```
+
+Result,
+
+```lua indent_size: 4 eval: vim.v
+vim.v = {
+    <metatable> = {
+        __index = <function 1>,
+        __newindex = <function 2>
+    }
+}
+```
+
+Tabs example,
+
+    ```lua indent_size: 0 eval: vim.v
+    ```
+
+Tabs result,
+
+```lua indent_size: 0 eval: vim.v
+vim.v = {
+	<metatable> = {
+		__index = <function 1>,
+		__newindex = <function 2>
+	}
+}
+```
+
 ### vars
 
 Example,
@@ -364,6 +407,7 @@ Result,
 ---@field path? string File path(relative to the markdown file). May contain `$VAR` style variables.
 ---@field range integer[] Tree-sitter node range(`[ row_start, col_start, row_end, col_end ]`).
 ---@field data mdtypes.code_block.data.item[] List of data to put inside the code block.
+---@field indent_size? integer Amount of spaces to add as indentation.
 ```
 
 Sets path variable. Variable names must only contain Uppercase letters.

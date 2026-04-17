@@ -330,6 +330,8 @@ mdtypes.parse = function (buffer)
 	end
 
 	root_parser:parse(true);
+
+	---@type mdtypes.code_block[]
 	local output = {};
 	local vars = {};
 
@@ -350,6 +352,7 @@ mdtypes.parse = function (buffer)
 			if info_string then
 				local text = vim.treesitter.get_node_text(info_string, buffer, {});
 
+				---@type mdtypes.code_block
 				local properties = {
 					range = { capture_node:range() },
 					data = {},
@@ -376,13 +379,15 @@ mdtypes.parse = function (buffer)
 
 								return "";
 							end);
+						elseif key == "indent_size" then
+							properties.indent_size = tonumber(value);
 						elseif string.match(key, "^%$") then
 							vars[key] = value;
 						else
 							table.insert(properties.data, {
 								kind = key,
 								value = value
-							});
+							} --[[@as mdtypes.code_block.data.item]]);
 						end
 					end
 				end
@@ -415,6 +420,7 @@ mdtypes.__cache = {};
 mdtypes.fill = function (block)
 	---|fS
 
+	---@type string[]
 	local lines = {};
 
 	local function get_funcref (this, funcname)
@@ -472,6 +478,17 @@ mdtypes.fill = function (block)
 	---|fE
 end
 
+mdtypes.indent_size = nil;
+
+local lpeg = vim.lpeg;
+local function reindent(indent)
+	return string.rep(
+		mdtypes.indent_size == 0 and "\t" or string.rep(" ", mdtypes.indent_size or vim.bo.tabstop or 4),
+		#indent / 2
+	);
+end
+local indentation = lpeg.Cs( ( lpeg.P("  ") / reindent )^0 * lpeg.P(1)^0);
+
 --- Generates text inside code blocks.
 ---@param buffer? integer
 mdtypes.generate = function (buffer)
@@ -491,13 +508,9 @@ mdtypes.generate = function (buffer)
 				local start = vim.api.nvim_buf_get_lines(buffer, R[1], R[1] + 1, false)[1];
 				local delimiter = string.match(start or "", "^[^`]+");
 
-				for l, line in ipairs(_lines) do
-					line = string.gsub(line, "^	+", function (t)
-						return string.rep(
-							string.rep(" ", vim.bo.tabstop or 4),
-							#t
-						);
-					end);
+				for l, _line in ipairs(_lines) do
+					mdtypes.indent_size = block.indent_size;
+					local line = indentation:match(_line);
 
 					if delimiter then
 						_lines[l] = delimiter .. line;

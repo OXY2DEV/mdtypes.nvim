@@ -29,6 +29,7 @@
 ---@field path? string File path(relative to the markdown file). May contain `$VAR` style variables.
 ---@field range integer[] Tree-sitter node range(`[ row_start, col_start, row_end, col_end ]`).
 ---@field data mdtypes.code_block.data.item[] List of data to put inside the code block.
+---@field indent_size? integer Amount of spaces to add as indentation.
 
 
 ---@class mdtypes.code_block.data.item
